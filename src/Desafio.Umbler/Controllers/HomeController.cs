@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Desafio.Umbler.Models;
+using Desafio.Umbler.Models.ViewModels;
 
 namespace Desafio.Umbler.Controllers
 {

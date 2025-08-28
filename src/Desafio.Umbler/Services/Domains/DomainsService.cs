@@ -20,7 +20,7 @@ namespace Desafio.Umbler.Services.Domains
 
         public DomainsService(DatabaseContext db, ILogger<DomainsService> logger)
         {
-            _db = db; 
+            _db = db;
             _lookup = new LookupClient();
             _logger = logger;
         }
@@ -33,58 +33,51 @@ namespace Desafio.Umbler.Services.Domains
 
                 var domain = await _db.Domains.FirstOrDefaultAsync(d => d.Name == domainName);
 
-                if (domain == null)
+                var domainDetails = await GetDomainDetails(domainName);
+
+                if (domainDetails == null) 
                 {
-                    var response = await WhoisClient.QueryAsync(domainName);
+                    domain = new Domain(domainName, domainDetails);
 
-                    var queryResult = await _lookup.QueryAsync(domainName, QueryType.ANY);
-                    var record = queryResult.Answers.ARecords().FirstOrDefault();
-                    var address = record?.Address;
-                    var ip = address?.ToString();
-
-                    var hostResponse = await WhoisClient.QueryAsync(ip);
-
-                    domain = new Domain
-                    {
-                        Name = domainName,
-                        Ip = ip,
-                        WhoIs = response.Raw,
-                        Ttl = record?.TimeToLive ?? 0,
-                        HostedAt = hostResponse.OrganizationName
-                    };
-
+                    _db.Domains.Add(domain);
                 }
 
                 if (DateTime.Now.Subtract(domain.UpdatedAt).TotalMinutes > domain.Ttl)
                 {
-                    var response = await WhoisClient.QueryAsync(domainName);
-
-                    var resultAAA = await _lookup.QueryAsync(domainName, QueryType.ANY);
-                    var record = resultAAA.Answers.ARecords().FirstOrDefault();
-                    var address = record?.Address;
-                    var ip = address?.ToString();
-
-                    var hostResponse = await WhoisClient.QueryAsync(ip);
-
-                    domain.Name = domainName;
-                    domain.Ip = ip;
-                    domain.UpdatedAt = DateTime.Now;
-                    domain.WhoIs = response.Raw;
-                    domain.Ttl = record?.TimeToLive ?? 0;
-                    domain.HostedAt = hostResponse.OrganizationName;
+                    domain.UpdateDomain(domainName, domainDetails); 
+                    _db.Domains.Update(domain);
                 }
 
-                _db.Domains.Add(domain);
                 await _db.SaveChangesAsync();
-
                 return new Result<Domain>(domain);
-
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                _logger.LogError(ex, "", domainName);
-                return null;
+                _logger.LogError(ex, "Falha ao obter um domínio pelo nome {domainName}", domainName);
+                return new Result<Domain>("Não foi possível localizar o domínio informado. Contate o setor de suporte");
             }
+        }
+
+        private async Task<DomainQueryResult> GetDomainDetails(string domainName)
+        {
+            var result = new DomainQueryResult();
+
+            var whoIsResponse = await WhoisClient.QueryAsync(domainName);
+            result.WhoIs = whoIsResponse.Raw;
+
+            var queryResult = await _lookup.QueryAsync(domainName, QueryType.ANY);
+            var record = queryResult.Answers.ARecords().FirstOrDefault();
+
+            result.Ttl = record?.TimeToLive ?? 0;
+            result.Ip = record?.Address?.ToString();
+
+            if (!string.IsNullOrWhiteSpace(result.Ip))
+            {
+                var hostResponse = await WhoisClient.QueryAsync(result.Ip);
+                result.HostedAt = hostResponse.OrganizationName;
+            }
+
+            return result;
         }
     }
 }
