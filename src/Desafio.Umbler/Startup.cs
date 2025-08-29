@@ -1,7 +1,7 @@
-﻿using System;
-using System.IO;
-using Desafio.Umbler.Persistence;
+﻿using Desafio.Umbler.Persistence;
 using Desafio.Umbler.Services.Domains;
+using Desafio.Umbler.Services.WhoIs;
+using DnsClient;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +10,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using System;
+using System.IO;
 
 namespace Desafio.Umbler
 {
@@ -44,6 +46,8 @@ namespace Desafio.Umbler
                         .EnableDetailedErrors()
                 );
 
+            services.AddScoped<ILookupClient, LookupClient>(sp => new LookupClient());
+            services.AddSingleton<IWhoIsService, WhoIsService>();
             services.AddScoped<IDomainsService, DomainsService>();
             services.AddControllersWithViews();
 

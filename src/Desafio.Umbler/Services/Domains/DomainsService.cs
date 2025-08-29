@@ -2,10 +2,10 @@
 using Desafio.Umbler.Models.Entities;
 using Desafio.Umbler.Models.ViewModels;
 using Desafio.Umbler.Persistence;
+using Desafio.Umbler.Services.WhoIs;
 using DnsClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Serilog.Core;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -16,13 +16,15 @@ namespace Desafio.Umbler.Services.Domains
     public class DomainsService : IDomainsService
     {
         private readonly DatabaseContext _db;
-        private readonly LookupClient _lookup;
+        private readonly ILookupClient _lookup;
+        private readonly IWhoIsService _whoIsService;
         private readonly ILogger<DomainsService> _logger;
 
-        public DomainsService(DatabaseContext db, ILogger<DomainsService> logger)
+        public DomainsService(DatabaseContext db, ILookupClient lookupClient, IWhoIsService whoIsService, ILogger<DomainsService> logger)
         {
             _db = db;
-            _lookup = new LookupClient();
+            _lookup = lookupClient;
+            _whoIsService = whoIsService;
             _logger = logger;
         }
 
@@ -30,20 +32,16 @@ namespace Desafio.Umbler.Services.Domains
         {
             try
             {
-                var result = new Result<Domain>();
-
                 var domain = await _db.Domains.FirstOrDefaultAsync(d => d.Name == domainName);
 
                 var domainDetails = await GetDomainDetails(domainName);
 
-                if (domainDetails == null) 
+                if (domain == null) 
                 {
                     domain = new Domain(domainName, domainDetails);
-
                     _db.Domains.Add(domain);
                 }
-
-                if (DateTime.Now.Subtract(domain.UpdatedAt).TotalMinutes > domain.Ttl)
+                else if (DateTime.Now.Subtract(domain.UpdatedAt).TotalSeconds > domain.Ttl)
                 {
                     domain.UpdateDomain(domainName, domainDetails); 
                     _db.Domains.Update(domain);
@@ -64,18 +62,22 @@ namespace Desafio.Umbler.Services.Domains
         {
             var result = new DomainQueryResult();
 
-            var whoIsResponse = await WhoisClient.QueryAsync(domainName);
+            var whoIsResponse = await _whoIsService.QueryAsync(domainName);
             result.WhoIs = whoIsResponse.Raw;
 
             var queryResult = await _lookup.QueryAsync(domainName, QueryType.ANY);
-            var record = queryResult.Answers.ARecords().FirstOrDefault();
+            var aRecords = queryResult.Answers.Where(x => x.RecordType == DnsClient.Protocol.ResourceRecordType.A)
+                                              .Cast<DnsClient.Protocol.ARecord>()
+                                              .ToList();
+            
+            var record = aRecords.FirstOrDefault();
 
             result.Ttl = record?.TimeToLive ?? 0;
             result.Ip = record?.Address?.ToString();
 
             if (!string.IsNullOrWhiteSpace(result.Ip))
             {
-                var hostResponse = await WhoisClient.QueryAsync(result.Ip);
+                var hostResponse = await _whoIsService.QueryAsync(result.Ip);
                 result.HostedAt = hostResponse.OrganizationName;
             }
 
