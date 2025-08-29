@@ -6,11 +6,11 @@ namespace Desafio.Umbler.Test
     [TestClass]
     public class DomainAttributeTests
     {
-        private readonly DomainAttribute _validator;
+        private readonly DomainOrIpAttribute _validator;
 
         public DomainAttributeTests()
         {
-            _validator = new DomainAttribute();
+            _validator = new DomainOrIpAttribute();
         }
 
         [TestMethod]
@@ -27,6 +27,25 @@ namespace Desafio.Umbler.Test
         {
             // Act
             var result = _validator.IsValid(domain);
+
+            // Assert
+            Assert.AreEqual(expected, result);
+        }
+
+        [TestMethod]
+        [DataRow("192.168.1.1", true)]
+        [DataRow("127.0.0.1", true)]
+        [DataRow("10.0.0.1", true)]
+        [DataRow("255.255.255.255", true)]
+        [DataRow("0.0.0.0", true)]
+        [DataRow("8.8.8.8", true)]
+        [DataRow("::1", true)] // IPv6 loopback
+        [DataRow("2001:db8::1", true)] // IPv6
+        [DataRow("fe80::1", true)] // IPv6 link-local
+        public void IsValid_ValidIpAddresses_ReturnsTrue(string ip, bool expected)
+        {
+            // Act
+            var result = _validator.IsValid(ip);
 
             // Assert
             Assert.AreEqual(expected, result);
@@ -54,6 +73,22 @@ namespace Desafio.Umbler.Test
         }
 
         [TestMethod]
+        [DataRow("256.1.1.1", false)] // IP inválido
+        [DataRow("192.168.1", false)] // IP incompleto
+        [DataRow("192.168.1.1.1", false)] // IP com octeto extra
+        [DataRow("abc.def.ghi.jkl", false)] // IP com letras
+        [DataRow("192.168.-1.1", false)] // IP com número negativo
+        [DataRow("192.168.1.256", false)] // IP com octeto > 255
+        public void IsValid_InvalidIpAddresses_ReturnsFalse(string ip, bool expected)
+        {
+            // Act
+            var result = _validator.IsValid(ip);
+
+            // Assert
+            Assert.AreEqual(expected, result);
+        }
+
+        [TestMethod]
         public void IsValid_DomainWithPath_ReturnsTrue()
         {
             // Arrange
@@ -61,6 +96,19 @@ namespace Desafio.Umbler.Test
 
             // Act
             var result = _validator.IsValid(domain);
+
+            // Assert
+            Assert.IsTrue(result);
+        }
+
+        [TestMethod]
+        public void IsValid_IpWithProtocol_ReturnsTrue()
+        {
+            // Arrange
+            var ip = "http://192.168.1.1";
+
+            // Act
+            var result = _validator.IsValid(ip);
 
             // Assert
             Assert.IsTrue(result);
@@ -93,10 +141,10 @@ namespace Desafio.Umbler.Test
         }
 
         [TestMethod]
-        public void ErrorMessage_HasDefaultMessage()
+        public void ErrorMessage_HasUpdatedMessage()
         {
             // Assert
-            Assert.AreEqual("O domínio informado não possui um formato válido.", _validator.ErrorMessage);
+            Assert.AreEqual("O valor informado não é um domínio ou IP válido.", _validator.ErrorMessage);
         }
 
         [TestMethod]

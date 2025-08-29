@@ -1,18 +1,19 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
+using System.Net;
 
 namespace Desafio.Umbler.Attributes
 {
-    public class DomainAttribute : ValidationAttribute
+    public class DomainOrIpAttribute : ValidationAttribute
     {
         private static readonly Regex DomainRegex = new Regex(
             @"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        public DomainAttribute()
+        public DomainOrIpAttribute()
         {
-            ErrorMessage = "O domínio informado não possui um formato válido.";
+            ErrorMessage = "O valor informado não é um domínio ou IP válido.";
         }
 
         public override bool IsValid(object value)
@@ -20,17 +21,28 @@ namespace Desafio.Umbler.Attributes
             if (value == null)
                 return true;
 
-            var domain = value.ToString();
+            var input = value.ToString();
 
-            if (string.IsNullOrWhiteSpace(domain))
+            if (string.IsNullOrWhiteSpace(input))
                 return true; 
 
-            domain = RemoveProtocol(domain);
+            var cleanInput = RemoveProtocol(input);
+            cleanInput = RemoveWww(cleanInput);
+            cleanInput = RemovePath(cleanInput);
 
-            domain = RemoveWww(domain);
+            if (IsValidIpAddress(cleanInput))
+                return true;
 
-            domain = RemovePath(domain);
+            return IsValidDomain(cleanInput);
+        }
 
+        private static bool IsValidIpAddress(string input)
+        {
+            return IPAddress.TryParse(input, out _);
+        }
+
+        private static bool IsValidDomain(string domain)
+        {
             if (domain.Length > 253) // RFC 1035
                 return false;
 
