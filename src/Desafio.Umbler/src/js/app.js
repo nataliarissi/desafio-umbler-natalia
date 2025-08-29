@@ -33,7 +33,7 @@ class Api {
   }
 
   async getDomain (domainOrIp) {
-    return this.request('GET', `domain/${domainOrIp}`)
+    return this.request('GET', `domains/${domainOrIp}`)
   }
 }
 

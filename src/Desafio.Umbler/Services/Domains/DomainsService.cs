@@ -1,5 +1,6 @@
 ﻿using Desafio.Umbler.Models.ApiModels;
 using Desafio.Umbler.Models.Entities;
+using Desafio.Umbler.Models.ViewModels;
 using Desafio.Umbler.Persistence;
 using DnsClient;
 using Microsoft.EntityFrameworkCore;
@@ -25,7 +26,7 @@ namespace Desafio.Umbler.Services.Domains
             _logger = logger;
         }
 
-        public async Task<Result<Domain>> GetDomainByName(string domainName)
+        public async Task<Result<DomainViewModel>> GetDomainByName(string domainName)
         {
             try
             {
@@ -49,12 +50,13 @@ namespace Desafio.Umbler.Services.Domains
                 }
 
                 await _db.SaveChangesAsync();
-                return new Result<Domain>(domain);
+                
+                return new Result<DomainViewModel>(new DomainViewModel(domain));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Falha ao obter um domínio pelo nome {domainName}", domainName);
-                return new Result<Domain>("Não foi possível localizar o domínio informado. Contate o setor de suporte");
+                return new Result<DomainViewModel>("Não foi possível localizar o domínio informado. Contate o setor de suporte");
             }
         }
 

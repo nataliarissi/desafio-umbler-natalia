@@ -11,8 +11,9 @@ namespace Desafio.Umbler.Models.ApiModels
 
         public Result(T data)
         {
-            Data = data;
-        } 
+            Data = data; 
+            Messages = new List<Message>();
+        }
 
         public Result(string errorMessage)
         {
