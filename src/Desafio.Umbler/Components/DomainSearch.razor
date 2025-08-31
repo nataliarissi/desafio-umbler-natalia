@@ -1,0 +1,362 @@
+@using Desafio.Umbler.Services.Domains
+@using Desafio.Umbler.Models.Entities
+@using Desafio.Umbler.Models.ApiModels
+@using Desafio.Umbler.Models.ViewModels
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Web
+@using System.Text.RegularExpressions
+@using System.Net
+@inject IDomainsService DomainsService
+
+<div id="mm-0" class="mm-page mm-slideout">
+    <section id="domain-search">
+        <div class="container py-4 pb-md-5">			
+            <div id="box-result" class="row">
+                <div class="col-lg-9 col-md-8">   
+                    <label class="sr-only" for="txt-search">Domínio</label>
+                    <input class="form-control form-control-lg domain @(isLoading ? "searching" : "") @(GetValidationClass())" 
+                           @bind="searchText" 
+                           @onkeypress="OnKeyPress"
+                           @oninput="OnInputChange"
+                           placeholder="Digite um domínio (ex: google.com) ou endereço IP (ex: 192.168.1.1)" 
+                           type="text" 
+                           disabled="@isLoading"
+                           id="txt-search" />
+                    @if (!string.IsNullOrEmpty(validationErrorMessage))
+                    {
+                        <div class="invalid-feedback d-block mt-1">
+                            <small>@validationErrorMessage</small>
+                        </div>
+                    }
+                </div>
+                <div class="col-lg-3 col-md-4 text-xs-right">
+                    <button type="button" 
+                            @onclick="SearchDomain" 
+                            class="btn btn-success btn-block btn-lg text-xs-center" 
+                            disabled="@(isLoading || !IsValidInput())">
+                        @if (isLoading)
+                        {
+                            <div class="spinner-border spinner-border-sm text-light" role="status">
+                                <span class="sr-only">Carregando...</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <i class="icon icon-search icon-white"></i>
+                        }
+                        <span>Pesquisar</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="container w-100">
+                <div class="row @((!hasResult && errorMessage == null && !isLoading) ? "hide" : "")" id="whois-results">
+                    <div class="col-12">
+                        @if (isLoading)
+                        {
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-success mb-3" role="status">
+                                    <span class="sr-only">Carregando...</span>
+                                </div>
+                                <div class="h5 text-muted">Aguarde, estamos buscando as informações</div>
+                            </div>
+                        }
+                        else if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="alert alert-danger" role="alert">
+                                <i class="icon icon-error mr-2"></i>
+                                @errorMessage
+                            </div>
+                        }
+                        else if (hasErrors)
+                        {
+                            @foreach (var message in errorMessages)
+                            {
+                                <div class="alert alert-danger" role="alert">
+                                    <i class="icon icon-error mr-2"></i>
+                                    @message.Value
+                                </div>
+                            }
+                        }
+                        else if (domainResult == null)
+                        {
+                              <div class="alert alert-warning" role="alert">
+                                <i class="icon icon-warning mr-2"></i>
+                                Nenhum dado encontrado para este domínio.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="domain-results-table w-100">
+                                <table class="table w-100">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Campo</th>
+                                            <th scope="col">Informação</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="domain-label">Nome do servidor</td>
+                                            <td>@(domainResult.Name ?? "Não encontrado")</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="domain-label">IP do registro</td>
+                                            <td>@(domainResult.Ip ?? "Não encontrado")</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="domain-label">Empresa que está hospedado</td>
+                                            <td>@(domainResult.HostedAt ?? "Não encontrado")</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- /#text-search -->
+
+    <section id="domain-list">
+        <div class="container my-3 my-lg-5">        
+        </div>
+    </section>
+
+    <!-- /#text-search -->
+
+    <section id="cta-list-ext" class="">
+        <div class="container text-xs-center py-5">  
+        </div>
+    </section>
+
+    <div id="table-list-ext" class="bg-faded bg-secondary-lighter" style="display:none">
+        <div class="container py-4">
+        </div>
+    </div>
+
+    <a id="back-top" href="javascript:void(0);" rel="nofollow" class="icon icon-arrow-upward icon-inverse icon-3x hidden-sm-down"></a>
+</div>
+
+@code {
+    private string searchText = "";
+    private string errorMessage = null;
+    private string validationErrorMessage = "";
+    private bool isLoading = false;
+    private bool hasResult = false;
+    private bool hasErrors = false;
+    private DomainViewModel domainResult = null;
+    private List<Message> errorMessages = new();
+
+    private static readonly Regex DomainRegex = new Regex(
+        @"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private async Task SearchDomain()
+    {
+        if (!IsValidInput())
+        {
+            return;
+        }
+
+        isLoading = true;
+        hasResult = false;
+        hasErrors = false;
+        errorMessage = null;
+        domainResult = null;
+        errorMessages.Clear();
+        validationErrorMessage = "";
+        StateHasChanged();
+
+        try
+        {
+            var cleanInput = CleanInput(searchText.Trim());
+            var result = await DomainsService.GetDomainByName(cleanInput);
+            
+            if (result != null)
+            {
+                if (result.Messages != null && result.Messages.Any(m => m.Type == MessageType.Error))
+                {
+                    hasErrors = true;
+                    errorMessages = result.Messages.Where(m => m.Type == MessageType.Error).ToList();
+                    hasResult = true;
+                }
+                else if (result.Data != null)
+                {
+                    domainResult = result.Data;
+                    hasResult = true;
+                }
+                else
+                {
+                    hasResult = true;
+                }
+            }
+            else
+            {
+                hasResult = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erro ao buscar informações: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !isLoading && IsValidInput())
+        {
+            await SearchDomain();
+        }
+    }
+
+    private void OnInputChange(ChangeEventArgs e)
+    {
+        searchText = e.Value?.ToString() ?? "";
+        ValidateInput();
+        StateHasChanged();
+    }
+
+    private void ValidateInput()
+    {
+        validationErrorMessage = "";
+        
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            return;
+        }
+
+        var trimmedInput = searchText.Trim();
+
+        if (trimmedInput.Length < 3)
+        {
+            validationErrorMessage = "O domínio ou IP deve ter pelo menos 3 caracteres.";
+            return;
+        }
+
+        if (trimmedInput.Length > 253)
+        {
+            validationErrorMessage = "O domínio é muito longo (máximo 253 caracteres).";
+            return;
+        }
+
+        if (ContainsInvalidCharacters(trimmedInput))
+        {
+            validationErrorMessage = "Contém caracteres inválidos. Use apenas letras, números, pontos e hífens.";
+            return;
+        }
+
+        var cleanInput = CleanInput(trimmedInput);
+
+        if (!IsValidIpAddress(cleanInput) && !IsValidDomain(cleanInput))
+        {
+            if (!cleanInput.Contains("."))
+            {
+                validationErrorMessage = "Digite um domínio válido (ex: google.com) ou endereço IP (ex: 192.168.1.1).";
+            }
+            else
+            {
+                validationErrorMessage = "Formato de domínio ou IP inválido.";
+            }
+            return;
+        }
+    }
+
+    private bool IsValidInput()
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return false;
+
+        var trimmedInput = searchText.Trim();
+        
+        if (trimmedInput.Length < 3 || trimmedInput.Length > 253)
+            return false;
+
+        if (ContainsInvalidCharacters(trimmedInput))
+            return false;
+
+        var cleanInput = CleanInput(trimmedInput);
+        return IsValidIpAddress(cleanInput) || IsValidDomain(cleanInput);
+    }
+
+    private bool ContainsInvalidCharacters(string input)
+    {
+        var allowedCharsRegex = new Regex(@"^[a-zA-Z0-9.\-:/?]*$");
+        return !allowedCharsRegex.IsMatch(input);
+    }
+
+    private string CleanInput(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return input;
+
+        var cleaned = input.ToLower();
+
+        if (cleaned.StartsWith("http://"))
+            cleaned = cleaned.Substring(7);
+        else if (cleaned.StartsWith("https://"))
+            cleaned = cleaned.Substring(8);
+
+        if (cleaned.StartsWith("www."))
+            cleaned = cleaned.Substring(4);
+
+        var slashIndex = cleaned.IndexOf('/');
+        if (slashIndex > 0)
+            cleaned = cleaned.Substring(0, slashIndex);
+
+        var questionIndex = cleaned.IndexOf('?');
+        if (questionIndex > 0)
+            cleaned = cleaned.Substring(0, questionIndex);
+
+        return cleaned;
+    }
+
+    private bool IsValidIpAddress(string input)
+    {
+        return IPAddress.TryParse(input, out _);
+    }
+
+    private bool IsValidDomain(string domain)
+    {
+        if (string.IsNullOrWhiteSpace(domain))
+            return false;
+
+        if (!DomainRegex.IsMatch(domain))
+            return false;
+
+        var labels = domain.Split('.');
+        foreach (var label in labels)
+        {
+            if (string.IsNullOrEmpty(label) || label.Length > 63)
+                return false;
+
+            if (label.StartsWith("-") || label.EndsWith("-"))
+                return false;
+        }
+
+        return true;
+    }
+
+    private string GetValidationClass()
+    {
+        if (isLoading || string.IsNullOrWhiteSpace(searchText))
+            return "";
+
+        var trimmedText = searchText.Trim();
+        
+        if (trimmedText.Length < 3)
+            return "";
+
+        if (IsValidInput())
+            return "is-valid";
+        else
+            return "is-invalid";
+    }
+}
