@@ -124,16 +124,23 @@ Se você rodar o projeto e testar um domínio, verá que ele já está funcionan
 ## Tests
 
  - Adicionei testes unitários para os serviços criados e pro controller do Domínio
+ - Fiz todos os outros testes da aplicação passarem. Tive que alterar como o teste obrigatório funcionava pois alterei a função como um todo, mas ela realiza o mock dos serviços como solicitado.
 
 # FrontEnd
 
 - Na parte do frontend possui validação de IP para complementar. Eu fiz isso pois pareceu que precisava disso, porém o whoIsService não funciona com ele pelos testes que eu realizei 
-- Utilizei blazor para chamar o serviço de domínio e também para isolar componentes da aplicação como a consulta de domínio, deixando a aplicação mais moderna
+- Utilizei blazor para chamar o serviço de domínio e também para isolar componentes da aplicação como a consulta de domínio, deixando a estrutura da aplicação mais moderna
 - Quando pesquisar um domínio, enquanto realiza a pesquisa o usuário não pode atualizar a resposta
 - O retorno das informações do domínio foram colocados em uma tabela
 - Adicionei uma função para pesquisar o domínio ao apertar o enter
 - Eu arrumei levemente o layout da página, quis preservar o layout original da página
 - Mudei a versão webpack da versão 3.8 para a 5, pois não consegui fazer funcionar sem fazer essa modificação
-- Adicionei validações para o usuário não poder enviar qualquer coisa na resposta que não seja um domínio ou ip válido com extensão
+- Adicionei validações para o usuário não poder enviar qualquer coisa na resposta que não seja um domínio com extensão ou ip válido
 - Preservei o endpoint caso ele seja utilizado por outras aplicações (app mobile por exemplo)
 - Tentei dar meu melhor na parte do frontend porém meu ponto forte é mais na área do backend. Eu continuo estudando e me dedicando pois gosto muito de frontend também
+
+# Modo de uso
+
+- Baixe o repositório com git clone;
+- Altere a connectionString Default presente no arquivo : src\Desafio.Umbler\appsettings.json para uma connectionString de seu computador;
+- Para realizar o teste local eu usei um container docker do mysql;

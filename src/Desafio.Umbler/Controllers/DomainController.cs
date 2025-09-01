@@ -20,7 +20,7 @@ namespace Desafio.Umbler.Controllers
         }
 
         [HttpGet, Route("{domainName}")]
-        public async Task<IActionResult> Get([DomainOrIp(ErrorMessage = "Domínio ou IP informado é inválido")] string domainName)
+        public async Task<IActionResult> Get([DomainValidation(ErrorMessage = "Domínio ou IP informado é inválido")] string domainName)
         {
             if (!ModelState.IsValid)
                 return GenerateErrorResult<Domain>();

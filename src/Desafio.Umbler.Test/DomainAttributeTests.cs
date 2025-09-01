@@ -6,11 +6,11 @@ namespace Desafio.Umbler.Test
     [TestClass]
     public class DomainAttributeTests
     {
-        private readonly DomainOrIpAttribute _validator;
+        private readonly DomainValidationAttribute _validator;
 
         public DomainAttributeTests()
         {
-            _validator = new DomainOrIpAttribute();
+            _validator = new DomainValidationAttribute();
         }
 
         [TestMethod]

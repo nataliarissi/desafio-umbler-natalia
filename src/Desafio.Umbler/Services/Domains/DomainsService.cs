@@ -40,14 +40,14 @@ namespace Desafio.Umbler.Services.Domains
                 {
                     domain = new Domain(domainName, domainDetails);
                     _db.Domains.Add(domain);
+                    await _db.SaveChangesAsync();
                 }
                 else if (DateTime.Now.Subtract(domain.UpdatedAt).TotalSeconds > domain.Ttl)
                 {
                     domain.UpdateDomain(domainName, domainDetails); 
                     _db.Domains.Update(domain);
-                }
-
-                await _db.SaveChangesAsync();
+                    await _db.SaveChangesAsync();
+                }                
                 
                 return new Result<DomainViewModel>(new DomainViewModel(domain));
             }
